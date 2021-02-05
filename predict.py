@@ -36,17 +36,23 @@ class predict:
 		predict.initSleep += 5   # Thread staggering may
 		time.sleep(initSleep)    # drift over time, no problem
 		while True:
-			dom = predict.req('predictions' +
-			  '&a=' + self.data[0] +   # Agency
-			  '&r=' + self.data[1] +   # Route
-			  '&s=' + self.data[2])    # Stop
+			dom = predict.req('arrivals-and-departures-for-stop/'
+			   + self.data[0] +   # Agency
+			  '_'
+			   + self.data[2])    # Stop
 			if dom is None: return     # Connection error
 			self.lastQueryTime = time.time()
-			predictions = dom.getElementsByTagName('prediction')
+			predictions = dom.getElementsByTagName('arrivalAndDeparture')
 			newList     = []
+			
 			for p in predictions:      # Build new prediction list
-				newList.append(
-				  int(p.getAttribute('seconds')))
+                                # filter by routes
+                                
+                                if str(p.getElementsByTagName('routeShortName')[0].firstChild.data) == self.data[1]:
+                                        preAway =  int(p.getElementsByTagName('predictedArrivalTime')[0].firstChild.data)/1000 - int(round(time.time(),0))
+                                        if preAway >= 0:
+                                                newList.append(int (preAway))
+				
 			self.predictions = newList # Replace current list
 			time.sleep(predict.interval)
 
@@ -56,8 +62,7 @@ class predict:
 		xml = None
 		try:
 			connection = urllib.urlopen(
-			  'http://webservices.nextbus.com'  +
-			  '/service/publicXMLFeed?command=' + cmd)
+			  'http://api.pugetsound.onebusaway.org/api/where/' + cmd + '.xml?key=TEST')
 			raw = connection.read()
 			connection.close()
 			xml = parseString(raw)

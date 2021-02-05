@@ -7,10 +7,10 @@ from predict import predict
 # lines/stops for your location, copy & paste results here.  The 4th
 # element on each line can then be edited for brevity if desired.
 stops = [
-  ( 'actransit', '210', '0702640', 'Ohlone College' ),
-  ( 'actransit', '210', '0702630', 'Union Landing' ),
-  ( 'actransit', '232', '0704440', 'Fremont BART' ),
-  ( 'actransit', '232', '0704430', 'NewPark Mall' ),
+  ('1', '44', '29453', 'NE 45th St & 7th Ave NE')
+        #( 'actransit', '210', '0702630', 'Union Landing' ),
+  #( 'actransit', '232', '0704440', 'Fremont BART' ),
+  #( 'actransit', '232', '0704430', 'NewPark Mall' ),
 ]
 
 # Populate a list of predict objects from stops[].  Each then handles
