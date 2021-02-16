@@ -16,11 +16,13 @@ from rgbmatrix import Adafruit_RGBmatrix
 # List of bus lines/stops to predict.  Use routefinder.py to look up
 # lines/stops for your location, copy & paste results here.  The 4th
 # string on each line can then be edited for brevity if desired.
+
+#agency_id (req), route_short_name (req), stop_id (req), direction (optional)
 stops = [
-  ( 'actransit', '210', '0702640', 'Ohlone College' ),
-  ( 'actransit', '232', '0704440', 'Fremont BART'   ),
-  ( 'actransit', '210', '0702630', 'Union Landing'  ),
-  ( 'actransit', '232', '0704430', 'NewPark Mall'   ) ]
+  ('1', '44', '29453', 'Univ of Washington')
+ # ( 'actransit', '232', '0704440', 'Fremont BART'   ),
+ # ( 'actransit', '210', '0702630', 'Union Landing'  ),
+ # ( 'actransit', '232', '0704430', 'NewPark Mall'   ) ]
 
 maxPredictions = 3   # NextBus shows up to 5; limit to 3 for simpler display
 minTime        = 0   # Drop predictions below this threshold (minutes)
