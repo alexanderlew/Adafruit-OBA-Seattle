@@ -19,7 +19,7 @@ from rgbmatrix import Adafruit_RGBmatrix
 
 #agency_id (req), route_short_name (req), stop_id (req), direction (optional)
 stops = [
-  ('1', '44', '29453', 'Univ of Washington')
+  ('1', '49', '11010', 'Downtown Seattle')
  # ( 'actransit', '232', '0704440', 'Fremont BART'   ),
  # ( 'actransit', '210', '0702630', 'Union Landing'  ),
  # ( 'actransit', '232', '0704430', 'NewPark Mall'   ) ]
