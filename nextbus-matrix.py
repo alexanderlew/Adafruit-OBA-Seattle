@@ -2,9 +2,9 @@
 # Requires rgbmatrix.so library: github.com/adafruit/rpi-rgb-led-matrix
 
 import atexit
-import Image
-import ImageDraw
-import ImageFont
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
 import math
 import os
 import time
