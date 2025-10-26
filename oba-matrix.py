@@ -1,20 +1,18 @@
 # ==========================
-# nextbus-matrix.py
+# oba-matrix.py
 # ==========================
-# Static OneBusAway display for Adafruit RGB LED Matrix (64x32)
-# Fetches top arrivals, abbreviates long destinations, and displays them
-# left-justified route + destination, right-justified minutes.
-# Requires: rgbmatrix library (hzeller/rpi-rgb-led-matrix) and requests
+# Non-scrolling 2-arrivals static display for Adafruit RGB LED Matrix (64x32)
+# Header: "Rte Dest Min" using smaller font
+# Fully left-justified route
+# Arrivals 2 pixels below header
+# Time (HH:MM) at bottom row
+# Compatible with Pi 1 B+, Python 3
 # ==========================
 
 import time
 import requests
-import os
-from PIL import Image, ImageDraw, ImageFont
+from datetime import datetime
 from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
-
-# Optional: keep if your repo uses prediction functions
-from predict import predict
 
 # ==========================
 # Configurable abbreviations
@@ -27,89 +25,76 @@ DEST_ABBREVIATIONS = {
     "Park & Ride": "P&R",
     "Seattle": "SEA",
     "Tacoma Dome": "T Dome",
+    "Lynnwood City Center": "Lynnwood",
+    "Lake": "Lk",
+    "Federal Way": "Fed Way"
 }
 
-MAX_DEST_LENGTH = 12  # maximum characters for destination
+ROUTE_ABBREVIATIONS = {
+    "1 Line": "1",
+    # add more as needed
+}
+
+MAX_DEST_CHARS = 12  # max characters for destination
 
 # ==========================
 # OneBusAway API configuration
 # ==========================
-OBA_API_KEY = "YOUR_KEY_HERE"  # replace with your OBA key
-# OneBusAway stop IDs (you can add as many as you want)
-STOP_IDS = ["1_75403", "1_12345"]  # replace with your actual stop IDs
+OBA_API_KEY = "TEST"
+STOP_IDS = ["40_99603", "40_99610"]
 
 # ==========================
-# Abbreviation helper
+# Abbreviation helpers
 # ==========================
-def abbreviate_destination(dest):
+def abbreviate_destination(dest, max_chars=MAX_DEST_CHARS):
     if not dest:
         return ""
-    # Apply replacements
     for full, abbr in DEST_ABBREVIATIONS.items():
         dest = dest.replace(full, abbr)
-    # Truncate intelligently
-    if len(dest) > MAX_DEST_LENGTH:
-        if " " in dest[:MAX_DEST_LENGTH]:
-            dest = dest[:MAX_DEST_LENGTH].rsplit(" ", 1)[0]
-        else:
-            dest = dest[:MAX_DEST_LENGTH]
+    if len(dest) > max_chars:
+        dest = dest[:max_chars]
     return dest
+
+def abbreviate_route(route):
+    return ROUTE_ABBREVIATIONS.get(route, route)
 
 # ==========================
 # Fetch arrivals from OneBusAway
 # ==========================
 def get_arrivals_from_oba():
-    all_arrivals = []
-    now_ms = int(time.time() * 1000)
-
+    arrivals = []
     for stop_id in STOP_IDS:
-        url = f"https://api.pugetsound.onebusaway.org/api/where/arrivals-and-departures-for-stop/{stop_id}.json?key={OBA_API_KEY}"
+        url = "https://api.pugetsound.onebusaway.org/api/where/arrivals-and-departures-for-stop/{0}.json?key={1}".format(
+            stop_id, OBA_API_KEY
+        )
         try:
-            resp = requests.get(url, timeout=10)
-            data = resp.json()
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
         except Exception as e:
-            print(f"OBA fetch error for stop {stop_id}:", e)
+            print("Error fetching OBA data for stop {}: {}".format(stop_id, e))
             continue
 
-        for a in data["data"]["entry"]["arrivalsAndDepartures"]:
-            arrival_time = a.get("predictedArrivalTime") or a.get("scheduledArrivalTime")
-            if not arrival_time:
+        current_time = data.get("currentTime", 0)
+        entries = data.get("data", {}).get("entry", {}).get("arrivalsAndDepartures", [])
+        for a in entries:
+            route = a.get("routeShortName") or a.get("routeId", "???")
+            route = abbreviate_route(route)
+            headsign = a.get("tripHeadsign", "Unknown")
+            predicted = a.get("predictedArrivalTime") or a.get("scheduledArrivalTime")
+            if not predicted:
                 continue
-            minutes = int((arrival_time - now_ms) / 60000)
-            if minutes < 0:
-                continue
-            all_arrivals.append({
-                "routeShortName": a.get("routeShortName", ""),
-                "tripHeadsign": a.get("tripHeadsign", ""),
-                "minutes": minutes
-            })
+            mins = int((predicted - current_time) / 60000)
+            if mins >= 0:
+                arrivals.append({
+                    "route": route,
+                    "headsign": headsign,
+                    "mins": mins
+                })
 
-    # Sort combined list by minutes ascending
-    all_arrivals.sort(key=lambda x: x["minutes"])
-    return all_arrivals
-
-
-# ==========================
-# Draw arrivals on matrix
-# ==========================
-def draw_arrivals(canvas, font, color, arrivals):
-    canvas.Clear()
-    line_height = 10
-    left_margin = 2
-
-    for i, a in enumerate(arrivals[:3]):  # show top 3 arrivals
-        y = (i + 1) * line_height
-        dest = abbreviate_destination(a['tripHeadsign'])
-        left_text = f"{a['routeShortName']} {dest}"
-        right_text = f"{a['minutes']} min"
-
-        # right-align minutes
-        right_width = graphics.DrawText(canvas, font, 0, 0, color, right_text)
-        right_x = 64 - right_width - 1
-
-        # draw left and right text
-        graphics.DrawText(canvas, font, left_margin, y, color, left_text)
-        graphics.DrawText(canvas, font, right_x, y, color, right_text)
+    arrivals.sort(key=lambda x: x['mins'])
+    print("Arrivals fetched:", arrivals)
+    return arrivals[:2]  # next 2 arrivals only
 
 # ==========================
 # Matrix initialization
@@ -119,25 +104,107 @@ options.rows = 32
 options.cols = 64
 options.chain_length = 1
 options.parallel = 1
-options.brightness = 20       # lower = less power draw
-options.gpio_slowdown = 2     # helps reduce flicker
+options.brightness = 50
+options.pwm_bits = 5
+options.hardware_mapping = "adafruit-hat"
+options.disable_hardware_pulsing = True
+options.gpio_slowdown = 4  # good for Pi 1
 
 matrix = RGBMatrix(options=options)
 offscreen_canvas = matrix.CreateFrameCanvas()
 
-# Load font
-font_path = "/home/pi/rpi-rgb-led-matrix/fonts/7x13.bdf"  # adjust path if needed
+# ==========================
+# Load fonts
+# ==========================
+font_path = "/home/pi/rpi-rgb-led-matrix/fonts/5x8.bdf"
 font = graphics.Font()
 font.LoadFont(font_path)
 
-# Text color
-textColor = graphics.Color(255, 255, 0)
+header_font_path = "/home/pi/rpi-rgb-led-matrix/fonts/4x6.bdf"
+headerFont = graphics.Font()
+headerFont.LoadFont(header_font_path)
+
+# Colors
+arrivalColor = graphics.Color(255, 255, 0)      # yellow
+headerColor = graphics.Color(0, 255, 255)       # cyan
+timeColor = graphics.Color(255, 0, 0)           # red (same as HELLO test)
+
+# ==========================
+# Draw header
+# ==========================
+def draw_header(canvas):
+    graphics.DrawText(canvas, headerFont, 1, 7, headerColor, "Rte Dest")
+    min_text = "Min"
+    min_width = graphics.DrawText(canvas, headerFont, 0, 0, headerColor, min_text)
+    graphics.DrawText(canvas, headerFont, 64 - min_width - 1, 7, headerColor, min_text)
+
+# ==========================
+# Draw arrivals
+# ==========================
+def draw_arrivals(canvas, font, color, arrivals):
+    line_height = 8  # 5x8 font
+    left_margin = 1
+    max_left_width = 64 - 12
+
+    for i, a in enumerate(arrivals):
+        # 2 pixels below bottom of header (header y=7, header height ~6)
+        y = 7 + 6 + 2 + i * line_height
+        dest = abbreviate_destination(a['headsign'])
+        route = a['route']
+        left_text = "{} {}".format(route, dest)
+
+        # truncate if needed
+        left_width = graphics.DrawText(canvas, font, 0, 0, color, left_text)
+        if left_width > max_left_width:
+            allowed_chars = int(len(left_text) * max_left_width / left_width)
+            left_text = left_text[:allowed_chars]
+
+        right_text = "{}".format(a['mins'])
+        right_width = graphics.DrawText(canvas, font, 0, 0, color, right_text)
+        right_x = 64 - right_width - 1
+
+        graphics.DrawText(canvas, font, left_margin, y, color, left_text)
+        graphics.DrawText(canvas, font, right_x, y, color, right_text)
+
+# ==========================
+# Draw time at bottom
+# ==========================
+def draw_time(canvas):
+    now = datetime.now()
+    time_text = now.strftime("%H:%M")
+    # 1 pixel from bottom
+    y = 32 - 1
+    width = graphics.DrawText(canvas, font, 0, 0, timeColor, time_text)
+    x = 64 - width - 1
+    graphics.DrawText(canvas, font, x, y, timeColor, time_text)
+
+# ==========================
+# HELLO test
+# ==========================
+print("Running HELLO test...")
+offscreen_canvas.Clear()
+graphics.DrawText(offscreen_canvas, font, 2, 15, timeColor, "HELLO")
+matrix.SwapOnVSync(offscreen_canvas)
+time.sleep(2)
+offscreen_canvas.Clear()
+matrix.SwapOnVSync(offscreen_canvas)
 
 # ==========================
 # Main loop
 # ==========================
 while True:
     arrivals = get_arrivals_from_oba()
-    draw_arrivals(offscreen_canvas, font, textColor, arrivals)
+    offscreen_canvas.Clear()
+    draw_header(offscreen_canvas)
+    if arrivals:
+        draw_arrivals(offscreen_canvas, font, arrivalColor, arrivals)
+    else:
+        print("No arrivals to display")
+    draw_time(offscreen_canvas)
+    
+    # clear top row manually to remove stray pixels
+    for x in range(64):
+        offscreen_canvas.SetPixel(x, 0, 0, 0, 0)
+
     offscreen_canvas = matrix.SwapOnVSync(offscreen_canvas)
-    time.sleep(30)  # refresh every 30 seconds
+    time.sleep(30)
