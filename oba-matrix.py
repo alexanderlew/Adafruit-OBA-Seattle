@@ -23,11 +23,12 @@ DEST_ABBREVIATIONS = {
     "Center": "Ctr",
     "Terminal": "Term",
     "Park & Ride": "P&R",
-    "Seattle": "SEA",
     "Tacoma Dome": "T Dome",
     "Lynnwood City Center": "Lynnwood",
     "Lake": "Lk",
-    "Federal Way": "Fed Way"
+    "Federal Way": "Fed Way",
+    "Downtown Seattle Broadway": "Downtown",
+    "U-District Station Capitol Hill": "U-District"
 }
 
 ROUTE_ABBREVIATIONS = {
@@ -38,10 +39,18 @@ ROUTE_ABBREVIATIONS = {
 MAX_DEST_CHARS = 12  # max characters for destination
 
 # ==========================
-# OneBusAway API configuration
+# OneBusAway API configuration - Stop Configurations
 # ==========================
 OBA_API_KEY = "TEST"
-STOP_IDS = ["40_99603", "40_99610"]
+
+# Cap Hill Station
+# STOP_IDS = ["40_99603", "40_99610"]
+
+# Int'l Dist / Chinatown
+# STOP_IDS = ["40_621", "40_623"]
+
+# 10th & Prospect (49)
+STOP_IDS = ["1_11230", "1_11010"]
 
 # ==========================
 # Abbreviation helpers
@@ -104,11 +113,14 @@ options.rows = 32
 options.cols = 64
 options.chain_length = 1
 options.parallel = 1
-options.brightness = 50
+options.brightness = 80
 options.pwm_bits = 5
 options.hardware_mapping = "adafruit-hat"
 options.disable_hardware_pulsing = True
 options.gpio_slowdown = 4  # good for Pi 1
+options.pwm_lsb_nanoseconds = 200
+options.limit_refresh_rate_hz = 100
+options.disable_hardware_pulsing = True
 
 matrix = RGBMatrix(options=options)
 offscreen_canvas = matrix.CreateFrameCanvas()
@@ -125,9 +137,9 @@ headerFont = graphics.Font()
 headerFont.LoadFont(header_font_path)
 
 # Colors
-arrivalColor = graphics.Color(255, 255, 0)      # yellow
-headerColor = graphics.Color(0, 255, 255)       # cyan
-timeColor = graphics.Color(255, 0, 0)           # red (same as HELLO test)
+arrivalColor = graphics.Color(225, 225, 0)      # yellow
+headerColor = graphics.Color(0, 225, 225)       # cyan
+timeColor = graphics.Color(225, 0, 0)           # red (same as HELLO test)
 
 # ==========================
 # Draw header
@@ -185,12 +197,12 @@ print("Running HELLO test...")
 offscreen_canvas.Clear()
 graphics.DrawText(offscreen_canvas, font, 2, 15, timeColor, "HELLO")
 matrix.SwapOnVSync(offscreen_canvas)
-time.sleep(2)
+time.sleep(4)
 offscreen_canvas.Clear()
 matrix.SwapOnVSync(offscreen_canvas)
 
 # ==========================
-# Main loop
+# Main loop and update interval
 # ==========================
 while True:
     arrivals = get_arrivals_from_oba()
@@ -207,4 +219,5 @@ while True:
         offscreen_canvas.SetPixel(x, 0, 0, 0, 0)
 
     offscreen_canvas = matrix.SwapOnVSync(offscreen_canvas)
-    time.sleep(30)
+
+    time.sleep(15)
